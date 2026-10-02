@@ -4,8 +4,6 @@ An API gateway and asynchronous job orchestration platform, built to demonstrate
 
 A client submits a job, the system validates and stores it, queues the work, and a separate worker process picks it up and runs it against downstream services. The project deliberately introduces failure (via configurable mock services) so real resilience mechanisms — retries, circuit breakers, rate limiting — have something genuine to react to.
 
-> **Status:** Actively in progress. Phases 1 and 2 are complete; Phase 3 is underway. See [Roadmap](#roadmap) below.
-
 ---
 
 ## Architecture
