@@ -12,7 +12,11 @@ export async function jobRoutes(app: FastifyInstance) {
     const job = await prisma.job.create({
       data: { type, payload },
     });
-    await jobQueue.add('process-job', { jobId: job.id });
+    await jobQueue.add(
+      'process-job',
+      { jobId: job.id },
+      { attempts: 3, backoff: { type: 'exponential', delay: 1000 } }
+    );
 
     return reply.code(201).send(job);
   });

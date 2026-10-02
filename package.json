@@ -18,6 +18,7 @@
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "bullmq": "^6.3.11",
+    "cockatiel": "^4.0.0",
     "dotenv": "^18.0.3",
     "fastify": "^5.12.5",
     "ioredis": "^6.0.0",
