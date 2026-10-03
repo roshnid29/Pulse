@@ -24,9 +24,9 @@ const worker = new Worker(
 
         try {
             
-            await customerService({ verified: true });
-            await paymentService({ success: true, transactionId: crypto.randomUUID() });
-            await notificationService({ sent: true });
+            await customerService.call({ verified: true });
+            await paymentService.call({ success: true, transactionId: crypto.randomUUID() });
+            await notificationService.call({ sent: true });
 
             await prisma.job.update({
                 where: { id: jobId },
