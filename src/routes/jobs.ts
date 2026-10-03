@@ -3,23 +3,60 @@ import { prisma } from '../lib/prisma.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { createJobSchema } from '../schema/job.schema.js';
 import { jobQueue } from '../lib/queue.js';
+import { checkRateLimit } from '../lib/rate-limit.js';
+import { claimIdempotencyKey, getIdempotencyResult, saveIdempotencyResult } from '../lib/idempotency.js';
 
 export async function jobRoutes(app: FastifyInstance) {
   // Create a job
-  app.post('/jobs', { schema: createJobSchema }, async (request, reply) => {
-    const { type, payload } = request.body as { type: string; payload: Prisma.InputJsonValue };
+  app.post(
+    '/jobs',
+    {
+      schema: createJobSchema,
+      preHandler: async (request, reply) => {
+        const { allowed, current, limit } = await checkRateLimit(request.ip);
 
-    const job = await prisma.job.create({
-      data: { type, payload },
+        if (!allowed) {
+          return reply.code(429).send({
+            message: 'Too many requests. Please try again later.',
+            limit,
+            current,
+          });
+        }
+      },
+    }, async (request, reply) => {
+      const { type, payload } = request.body as { type: string; payload: Prisma.InputJsonValue };
+      const idempotencyKey = request.headers['idempotency-key'] as string | undefined;
+
+      if (idempotencyKey) {
+        const claimed = await claimIdempotencyKey(idempotencyKey);
+
+        if (!claimed) {
+          const existingJobId = await getIdempotencyResult(idempotencyKey);
+
+          if (existingJobId === null) {
+            return reply.code(409).send({ message: 'This request is already being processed.' });
+          }
+
+          const existingJob = await prisma.job.findUnique({ where: { id: existingJobId } });
+          return reply.code(200).send(existingJob);
+        }
+      }
+
+      const job = await prisma.job.create({
+        data: { type, payload },
+      });
+      await jobQueue.add(
+        'process-job',
+        { jobId: job.id },
+        { attempts: 3, backoff: { type: 'exponential', delay: 1000 } }
+      );
+
+      if (idempotencyKey) {
+        await saveIdempotencyResult(idempotencyKey, job.id);
+      }
+
+      return reply.code(201).send(job);
     });
-    await jobQueue.add(
-      'process-job',
-      { jobId: job.id },
-      { attempts: 3, backoff: { type: 'exponential', delay: 1000 } }
-    );
-
-    return reply.code(201).send(job);
-  });
 
   // Get a job by id
   app.get('/jobs/:id', async (request, reply) => {
