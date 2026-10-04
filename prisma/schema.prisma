@@ -16,15 +16,16 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
-  role      Role     @default(CUSTOMER)
+  role      Role     @default(USER)
   createdAt DateTime @default(now())
 
   jobs      Job[]
 }
 
 enum Role {
-  CUSTOMER
+  USER
   ADMIN
+  WORKER
 }
 
 model Job {
@@ -62,3 +63,4 @@ model JobAttempt {
   jobId       String
   job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 }
+
