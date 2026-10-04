@@ -3,6 +3,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { jobRoutes } from './routes/jobs.js';
 import { healthRoutes } from './routes/health.js';
+import { authRoutes } from './routes/auth.js';
 
 export function buildApp() {
   const app = Fastify({
@@ -25,6 +26,8 @@ export function buildApp() {
   app.register(jobRoutes);
 
   app.register(healthRoutes);
+
+  app.register(authRoutes);
 
   return app;
 }

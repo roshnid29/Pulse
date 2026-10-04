@@ -5,6 +5,7 @@ import { createJobSchema } from '../schema/job.schema.js';
 import { jobQueue } from '../lib/queue.js';
 import { checkRateLimit } from '../lib/rate-limit.js';
 import { claimIdempotencyKey, getIdempotencyResult, saveIdempotencyResult } from '../lib/idempotency.js';
+import { authenticate } from '../lib/auth.js';
 
 export async function jobRoutes(app: FastifyInstance) {
   // Create a job
@@ -12,17 +13,20 @@ export async function jobRoutes(app: FastifyInstance) {
     '/jobs',
     {
       schema: createJobSchema,
-      preHandler: async (request, reply) => {
-        const { allowed, current, limit } = await checkRateLimit(request.ip);
+      preHandler: [
+        authenticate,
+        async (request, reply) => {
+          const { allowed, current, limit } = await checkRateLimit(request.ip);
 
-        if (!allowed) {
-          return reply.code(429).send({
-            message: 'Too many requests. Please try again later.',
-            limit,
-            current,
-          });
-        }
-      },
+          if (!allowed) {
+            return reply.code(429).send({
+              message: 'Too many requests. Please try again later.',
+              limit,
+              current,
+            });
+          }
+        },
+      ],
     }, async (request, reply) => {
       const { type, payload } = request.body as { type: string; payload: Prisma.InputJsonValue };
       const idempotencyKey = request.headers['idempotency-key'] as string | undefined;
@@ -43,7 +47,7 @@ export async function jobRoutes(app: FastifyInstance) {
       }
 
       const job = await prisma.job.create({
-        data: { type, payload },
+        data: { type, payload, userId: (request as any).user.userId },
       });
       await jobQueue.add(
         'process-job',
@@ -59,8 +63,9 @@ export async function jobRoutes(app: FastifyInstance) {
     });
 
   // Get a job by id
-  app.get('/jobs/:id', async (request, reply) => {
+  app.get('/jobs/:id', { preHandler: authenticate }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const currentUser = (request as any).user as { userId: string; role: string };
 
     const job = await prisma.job.findUnique({
       where: { id },
@@ -71,12 +76,24 @@ export async function jobRoutes(app: FastifyInstance) {
       return reply.code(404).send({ message: 'Job not found' });
     }
 
+    const isOwner = job.userId === currentUser.userId;
+    const isAdmin = currentUser.role === 'ADMIN';
+
+    if (!isOwner && !isAdmin) {
+      return reply.code(403).send({ message: 'You do not have access to this job' });
+    }
+
     return job;
   });
 
   // List jobs
-  app.get('/jobs', async () => {
+  app.get('/jobs', { preHandler: authenticate }, async (request) => {
+    const currentUser = (request as any).user as { userId: string; role: string };
+
+    const where = currentUser.role === 'ADMIN' ? {} : { userId: currentUser.userId };
+
     return prisma.job.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
     });
   });
