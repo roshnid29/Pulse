@@ -34,12 +34,11 @@ model Job {
   payload     Json
   status      JobStatus   @default(PENDING)
   error       String?
+  requestId   String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-
   userId      String?
   user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-
   attempts    JobAttempt[]
 }
 
