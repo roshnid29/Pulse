@@ -6,6 +6,7 @@ import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { randomUUID } from 'crypto';
 import { httpRequestCounter, httpRequestDuration, register } from './lib/metrics.js';
+import { chaosRoutes } from './routes/chaos.js';
 
 export function buildApp() {
   const app = Fastify({
@@ -47,6 +48,8 @@ export function buildApp() {
   app.register(healthRoutes);
 
   app.register(authRoutes);
+
+  app.register(chaosRoutes);
 
   return app;
 }

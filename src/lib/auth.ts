@@ -22,3 +22,13 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
     return reply.code(401).send({ message: 'Invalid or expired token' });
   }
 }
+
+export function requireRole(...allowedRoles: string[]) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = (request as any).user as { role: string } | undefined;
+
+    if (!user || !allowedRoles.includes(user.role)) {
+      return reply.code(403).send({ message: 'You do not have permission to perform this action' });
+    }
+  };
+}
